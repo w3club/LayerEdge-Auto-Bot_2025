@@ -5,8 +5,6 @@
 ## Features
 
 - **Auto Run Node**
-- **Auto Create Accounts**
-- **Auto Referrall**
 - **Support Proxy usage**
 - **Auto Claim Points every hour**
 
