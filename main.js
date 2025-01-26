@@ -65,7 +65,7 @@ const logger = {
             : chalk.yellow('➤');
         
         console.log(
-            chalk.cyan('◆ LayerEdge Automation'),
+            chalk.cyan('◆ LayerEdge Auto Bot'),
             chalk.gray(`[${new Date().toLocaleTimeString()}]`),
             chalk.blueBright(`[PROGRESS]`),
             `${progressStyle} ${wallet} - ${step}`
@@ -298,7 +298,7 @@ async function readWallets() {
 
 async function run() {
     console.log(banner);  // Display banner at start
-    logger.info('Starting Layer Edge Automation', 'Initializing...');
+    logger.info('Starting Layer Edge Auto Bot', 'Initializing...');
     await delay(3);
 
     const proxies = await readFile('proxy.txt');
