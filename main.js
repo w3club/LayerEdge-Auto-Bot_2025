@@ -319,39 +319,43 @@ class LayerEdgeConnection {
     }
 
     // Fix daily check-in signature
-    async dailyCheckIn() {
-    const message = `I am claiming my daily node point for ${this.wallet.address}`;
-    const sign = await this.wallet.signMessage(message);
-
-    const dataSign = {
-        sign: sign,
-        walletAddress: this.wallet.address
-    };
-
+  async dailyCheckIn() {
     try {
-        const response = await this.makeRequest(
-            "post",
-            "https://referralapi.layeredge.io/api/light-node/claim-node-points",
-            { data: dataSign }
-        );
+      const timestamp = Date.now();
+      const message = `I am claiming my daily node point for ${this.wallet.address} at ${timestamp}`;
+      const sign = await this.wallet.signMessage(message);
+      const dataSign = { sign, timestamp, walletAddress: this.wallet.address };
+      const config = {
+        data: dataSign,
+        headers: { 'Content-Type': 'application/json' }
+      };
 
-        if (response && response.data) {
-            if (response.data.status === "success") {
-                logger.info("Daily Check-in Successful");
-            } else {
-                logger.error("Daily Check-in Failed", JSON.stringify(response.data, null, 2));
-            }
-            return true;
+      const response = await this.makeRequest(
+        "post",
+        "https://referralapi.layeredge.io/api/light-node/claim-node-points",
+        config
+      );
+
+      if (response && response.data) {
+        // Jika API mengembalikan statusCode 405 (sudah check-in) kita ekstrak waktu cooldown
+        if (response.data.statusCode && response.data.statusCode === 405) {
+          const cooldownMatch = response.data.message.match(/after\s+([^!]+)!/);
+          const cooldownTime = cooldownMatch ? cooldownMatch[1].trim() : "unknown time";
+          logger.info("⚠️ Daily Check-in Already Completed", `Come back after ${cooldownTime}`);
+          return true;
         } else {
-            logger.error("Failed to perform daily check-in");
-            return false;
+          logger.info("✅ Daily Check-in Successful", formatResponse(response.data));
+          return true;
         }
-    } catch (error) {
-        logger.error("Error during daily check-in", "", error);
+      } else {
+        logger.error("❌ Daily Check-in Failed");
         return false;
+      }
+    } catch (error) {
+      logger.error("Error during daily check-in:", error);
+      return false;
     }
-}
-
+  }
     async checkNodeStatus() {
         const response = await this.makeRequest(
             "get",
@@ -386,7 +390,7 @@ class LayerEdgeConnection {
 // Main Application
 async function readWallets() {
     try {
-        await fs.access("wallets1.json");
+        await fs.access("wallets.json");
         const data = await fs.readFile("wallets.json", "utf-8");
         return JSON.parse(data);
     } catch (err) {
