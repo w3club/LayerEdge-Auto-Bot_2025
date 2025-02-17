@@ -51,10 +51,11 @@ const logger = {
         let formattedMessage = `${header} ${timestamp} ${levelTag} ${message}`;
         
         if (value) {
+            const formattedValue= typeof value === 'object' ? JSON.stringify(value) : value;
             const valueStyle = level === 'error' ? chalk.red : 
                              level === 'warn' ? chalk.yellow : 
                              chalk.green;
-            formattedMessage += ` ${valueStyle(value)}`;
+            formattedMessage += ` ${valueStyle(formattedValue)}`;
         }
 
         if (error && this.verbose) {
@@ -337,7 +338,6 @@ class LayerEdgeConnection {
       );
 
       if (response && response.data) {
-        // Jika API mengembalikan statusCode 405 (sudah check-in) kita ekstrak waktu cooldown
         if (response.data.statusCode && response.data.statusCode === 405) {
           const cooldownMatch = response.data.message.match(/after\s+([^!]+)!/);
           const cooldownTime = cooldownMatch ? cooldownMatch[1].trim() : "unknown time";
