@@ -387,11 +387,11 @@ class LayerEdgeConnection {
 async function readWallets() {
     try {
         await fs.access("wallets1.json");
-        const data = await fs.readFile("wallets1.json", "utf-8");
+        const data = await fs.readFile("wallets.json", "utf-8");
         return JSON.parse(data);
     } catch (err) {
         if (err.code === 'ENOENT') {
-            logger.info("No wallets found in wallets1.json");
+            logger.info("No wallets found in wallets.json");
             return [];
         }
         throw err;
