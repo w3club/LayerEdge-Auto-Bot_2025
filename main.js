@@ -318,17 +318,17 @@ class LayerEdgeConnection {
         }
     }
 
+    // Fix daily check-in signature
     async dailyCheckIn() {
-        const timestamp = Date.now();
-        const message = `Daily check-in request for ${this.wallet.address} at ${timestamp}`;
-        const sign = await this.wallet.signMessage(message);
+    const message = `I am claiming my daily node point for ${this.wallet.address}`;
+    const sign = await this.wallet.signMessage(message);
 
-        const dataSign = {
-            sign: sign,
-            timestamp: timestamp,
-            walletAddress: this.wallet.address
-        };
+    const dataSign = {
+        sign: sign,
+        walletAddress: this.wallet.address
+    };
 
+    try {
         const response = await this.makeRequest(
             "post",
             "https://referralapi.layeredge.io/api/light-node/claim-node-points",
@@ -336,13 +336,21 @@ class LayerEdgeConnection {
         );
 
         if (response && response.data) {
-            logger.info("Daily Check in Result:", response.data);
+            if (response.data.status === "success") {
+                logger.info("Daily Check-in Successful");
+            } else {
+                logger.error("Daily Check-in Failed", JSON.stringify(response.data, null, 2));
+            }
             return true;
         } else {
             logger.error("Failed to perform daily check-in");
             return false;
         }
+    } catch (error) {
+        logger.error("Error during daily check-in", "", error);
+        return false;
     }
+}
 
     async checkNodeStatus() {
         const response = await this.makeRequest(
