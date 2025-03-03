@@ -5,6 +5,7 @@ import { HttpsProxyAgent } from 'https-proxy-agent';
 import { SocksProxyAgent } from 'socks-proxy-agent';
 import { Wallet } from "ethers";
 import banner from './utils/banner.js';
+import { autoRegister, autoRegisterExistedWallet } from './ref.js';
 
 const logger = {
     verbose: true,
@@ -124,15 +125,6 @@ class RequestHandler {
 
 function delay(ms) {
     return new Promise(resolve => setTimeout(resolve, ms * 1000));
-}
-
-async function saveToFile(filename, data) {
-    try {
-        await fs.appendFile(filename, `${data}\n`, 'utf-8');
-        logger.info(`Data saved to ${filename}`);
-    } catch (error) {
-        logger.error(`Failed to save data to ${filename}: ${error.message}`);
-    }
 }
 
 async function readFile(pathFile) {
@@ -382,8 +374,20 @@ class LayerEdgeConnection {
             const message = `I am submitting a proof for LayerEdge at ${timestamp}`;
             const signature = await this.wallet.signMessage(message);
             
+            const gmMessages = [
+                "Gm!",
+                "Good morning!",
+                "GM, have a great day!",
+                "Gm! Let's make it a good one.",
+                "Morning! Gm vibes.",
+                "Gm, here's to a productive day."
+            ];
+            
+            const randomIndex = Math.floor(Math.random() * gmMessages.length);
+            const randomGm = gmMessages[randomIndex];
+
             const proofData = {
-                proof: "GmEdgesss",
+                proof: randomGm,
                 signature: signature,
                 message: message,
                 address: this.wallet.address
@@ -486,6 +490,9 @@ class LayerEdgeConnection {
                 return true;
             } else {
                 logger.error("Failed to claim light node points", response?.data);
+                if(response?.data?.statusCode === 404){
+                    await autoRegisterExistedWallet()
+                }
                 return false;
             }
         } catch (error) {
@@ -529,52 +536,60 @@ async function run() {
         logger.info('Configuration loaded', `Wallets: ${wallets.length}, Proxies: ${proxies.length}`);
 
         while (true) {
-            for (let i = 0; i < wallets.length; i++) {
-                const wallet = wallets[i];
-                const proxy = proxies[i % proxies.length] || null;
-                const { address, privateKey } = wallet;
-                
-                try {
-                    logger.verbose(`Processing wallet ${i + 1}/${wallets.length}`, address);
-                    const socket = new LayerEdgeConnection(proxy, privateKey);
+            const batchSize = 20;
+            for (let i = 0; i < wallets.length; i += batchSize) {
+                const batch = wallets.slice(i, i + batchSize);
+                const walletPromises = batch.map(async (wallet, j) => {
+                    const indexInBatch = i + j;
+                    const proxy = proxies[indexInBatch % proxies.length] || null;
+                    const { address, privateKey } = wallet;
                     
-                    logger.progress(address, 'Wallet Processing Started', 'start');
-                    logger.info(`Wallet Details`, `Address: ${address}, Proxy: ${proxy || 'No Proxy'}`);
+                    try {
+                        logger.verbose(`Processing wallet ${indexInBatch + 1}/${wallets.length}`, address);
+                        const socket = new LayerEdgeConnection(proxy, privateKey);
+                        
+                        logger.progress(address, 'Wallet Processing Started', 'start');
+                        logger.info(`Wallet Details`, `Address: ${address}, Proxy: ${proxy || 'No Proxy'}`);
 
-                    logger.progress(address, 'Performing Daily Check-in', 'processing');
-                    await socket.dailyCheckIn();
+                        logger.progress(address, 'Performing Daily Check-in', 'processing');
+                        const res = await socket.dailyCheckIn();
 
-                    logger.progress(address, 'Submitting Proof', 'processing');
-                    await socket.submitProof();
+                        logger.progress(address, 'Submitting Proof', 'processing');
+                        await socket.submitProof();
 
-                    logger.progress(address, 'Claiming Proof Submission Points', 'processing');
-                    await socket.claimProofSubmissionPoints();
+                        logger.progress(address, 'Claiming Proof Submission Points', 'processing');
+                        await socket.claimProofSubmissionPoints();
 
-                    logger.progress(address, 'Checking Node Status', 'processing');
-                    const isRunning = await socket.checkNodeStatus();
+                        logger.progress(address, 'Checking Node Status', 'processing');
+                        const isRunning = await socket.checkNodeStatus();
 
-                    if (isRunning) {
-                        logger.progress(address, 'Claiming Node Points', 'processing');
-                        await socket.stopNode();
+                        if (isRunning) {
+                            logger.progress(address, 'Claiming Node Points', 'processing');
+                            await socket.stopNode();
+                        }
+
+                        logger.progress(address, 'Reconnecting Node', 'processing');
+                        await socket.connectNode();
+
+                        logger.progress(address, 'Claiming Light Node Points', 'processing');
+                        await socket.claimLightNodePoints();
+
+                        logger.progress(address, 'Checking Node Points', 'processing');
+                        await socket.checkNodePoints();
+
+                        logger.progress(address, 'Wallet Processing Complete', 'success');
+                    } catch (error) {
+                        logger.error(`Failed processing wallet ${address}`, '', error);
+                        logger.progress(address, 'Wallet Processing Failed', 'failed');
+                        await delay(5);
                     }
+                });
 
-                    logger.progress(address, 'Reconnecting Node', 'processing');
-                    await socket.connectNode();
-
-                    logger.progress(address, 'Claiming Light Node Points', 'processing');
-                    await socket.claimLightNodePoints();
-
-                    logger.progress(address, 'Checking Node Points', 'processing');
-                    await socket.checkNodePoints();
-
-                    logger.progress(address, 'Wallet Processing Complete', 'success');
-                } catch (error) {
-                    logger.error(`Failed processing wallet ${address}`, '', error);
-                    logger.progress(address, 'Wallet Processing Failed', 'failed');
-                    await delay(5);
-                }
+                await Promise.all(walletPromises);
             }
             
+            logger.progress(`start register new wallets`);
+            await autoRegister();
             logger.warn('Cycle Complete', 'Waiting 1 hour before next run...');
             await delay(60 * 60);
         }
