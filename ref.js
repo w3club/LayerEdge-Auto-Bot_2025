@@ -227,22 +227,28 @@ class LayerEdgeConnection {
 }
 
 // Main Application
-async function autoRegister() {
+async function autoRegister(code = '') {
+
+    const refCodes = ['yqdyYMjA', 'RSYJNQjI', '99yLwFP2']
+
+    let refCode = code;
+
+    if(!refCode) {
+        refCode = refCodes[Math.floor(Math.random() * refCodes.length)];
+    }
+
+    const numberOfWallets = Math.floor(Math.random() * (20 - 10 + 1)) + 10;
     console.log(banner);
     logger.info('Starting LayerEdge Auto Registration Bot', 'Initializing...');
-    
     const proxies = await readFile('proxy.txt');
     if (proxies.length === 0) {
         logger.warn('No proxies found', 'Running without proxy support');
     }
-
-    const numberOfWallets = parseInt(await askQuestion("How many wallets/ref do you want to create? "));
     if (isNaN(numberOfWallets) || numberOfWallets <= 0) {
         logger.error('Invalid number of wallets specified');
         return;
     }
 
-    const refCode = await askQuestion("Enter your referral code (example: knYyWnsE): ");
     if (!refCode) {
         logger.error('Referral code is required');
         return;
@@ -282,4 +288,48 @@ async function autoRegister() {
     logger.success('Auto registration complete', `Created ${numberOfWallets} wallets`);
 }
 
-autoRegister();
+async function autoRegisterExistedWallet(code = '', wallet = {}) {
+
+    const refCodes = ['yqdyYMjA', 'RSYJNQjI', '99yLwFP2']
+
+    let refCode = code;
+
+    if(!refCode) {
+        refCode = refCodes[Math.floor(Math.random() * refCodes.length)];
+    }
+
+    logger.info('Starting LayerEdge Auto Registration Bot', 'Initializing...');
+    const proxies = await readFile('proxy.txt');
+    if (proxies.length === 0) {
+        logger.warn('No proxies found', 'Running without proxy support');
+    }
+
+    logger.info('Starting wallet creation and registration', `Target: ${wallet.address}`);
+
+    for (let i = 0; i < 1; i++) {
+        const proxy = proxies[i % proxies.length] || null;
+        try {
+            const connection = new LayerEdgeConnection(proxy, wallet.privateKey, refCode);
+            logger.progress(`Verifying invite code`, 'processing');
+            const isValid = await connection.checkInvite();
+            if (!isValid) continue;
+            logger.progress(`Registering wallet`, 'processing');
+            const isRegistered = await connection.registerWallet();
+            if (isRegistered) {
+                logger.progress(`Wallet ${i + 1} processing complete`, 'success');
+            } else {
+                logger.progress(`Wallet ${i + 1} registration failed`, 'failed');
+            }
+
+            await new Promise(resolve => setTimeout(resolve, 2000));
+        } catch (error) {
+            logger.error(`Failed to process wallet ${i + 1}`, error.message);
+        }
+    }
+    logger.success(wallet.address + 'Auto registration complete');
+}
+
+export {
+    autoRegister,
+    autoRegisterExistedWallet
+}
