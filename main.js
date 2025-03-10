@@ -587,9 +587,6 @@ async function run() {
 
                 await Promise.all(walletPromises);
             }
-            
-            logger.progress(`start register new wallets`);
-            await autoRegister();
             logger.warn('Cycle Complete', 'Waiting 1 hour before next run...');
             await delay(60 * 60);
         }
